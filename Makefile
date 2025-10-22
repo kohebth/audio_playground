@@ -1,12 +1,13 @@
-# Compiler
-CC = g++
-CFLAGS = -O2 -std=c++11 $(shell pkg-config --cflags libpipewire-0.3)
-LDFLAGS = $(shell pkg-config --libs libpipewire-0.3)
-
 # Directories
 SRC_DIR = src
-OBJ_DIR = obj
+INC_DIR = inc
+OBJ_DIR = bin
 BIN_DIR = bin
+
+# Compiler
+CC = g++
+CFLAGS = -O2 -std=c++17 $(shell pkg-config --cflags libpipewire-0.3) -I$(INC_DIR)
+LDFLAGS = $(shell pkg-config --libs libpipewire-0.3)
 
 # Source and object files
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
@@ -32,12 +33,9 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Ensure dirs exist
-$(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)
-
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 # Clean
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -rf $(BIN_DIR) $(OBJ_DIR)

@@ -1,86 +1,93 @@
 #include <pipewire/pipewire.h>
 #include <spa/param/audio/format-utils.h>
-#include <stdio.h>
-#include <signal.h>
-#include <string.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <csignal>
+#include <cstring>
+// #include <buffer.h>
 
 #define MAX_BUFFERS 4
-#define BUFFER_SIZE 8192
+#define BUFFER_SIZE 2048
 
 struct audio_buffer {
-    uint8_t data[BUFFER_SIZE];
-    uint32_t size;
+    uint16_t data[BUFFER_SIZE];
+    uint16_t size;
     volatile int ready;
 };
 
-struct data {
-    struct pw_main_loop *loop;
-    struct pw_stream *capture_stream;
-    struct pw_stream *playback_stream;
-    struct audio_buffer buffers[MAX_BUFFERS];
-    volatile int write_idx;
-    volatile int read_idx;
+struct node_buffer {
+    audio_buffer chunks[MAX_BUFFERS];
+    volatile uint8_t write_idx;
+    volatile uint8_t read_idx;
 };
 
-static void on_capture_process(void *userdata) {
-    struct data *d = (struct data *)userdata;
-    struct pw_buffer *b;
-    struct spa_buffer *buf;
-    int idx;
+struct node {
+    pw_main_loop *loop;
+    pw_stream *stream;
+    node_buffer *buffer;
+};
 
-    if ((b = pw_stream_dequeue_buffer(d->capture_stream)) == NULL) {
+inline bool is_not_null(void *ptr) {
+    return ptr != nullptr;
+}
+
+static void on_capture_process(void *userdata) {
+    auto node = static_cast<::node *>(userdata);
+    pw_buffer *b;
+
+    if ((b = pw_stream_dequeue_buffer(node->stream)) == nullptr) {
         return;
     }
 
-    buf = b->buffer;
-    if (buf->datas[0].data != NULL && buf->datas[0].chunk->size > 0) {
-        idx = d->write_idx;
-        uint32_t size = buf->datas[0].chunk->size;
+    const spa_buffer *buf = b->buffer;
 
-        if (size > BUFFER_SIZE)
-            size = BUFFER_SIZE;
+    if (is_not_null(buf->datas[0].data) && buf->datas[0].chunk->size > 0) {
+        uint16_t size = buf->datas[0].chunk->size;
+        volatile uint8_t *idx = &node->buffer->write_idx;
+        audio_buffer *chunk = &node->buffer->chunks[*idx];
+
+        if (size > BUFFER_SIZE) size = BUFFER_SIZE;
 
         // Write to buffer if not in use
-        if (!d->buffers[idx].ready) {
-            memcpy(d->buffers[idx].data, buf->datas[0].data, size);
-            d->buffers[idx].size = size;
-            __sync_synchronize();  // Memory barrier
-            d->buffers[idx].ready = 1;
-            d->write_idx = (idx + 1) % MAX_BUFFERS;
-        }
+        // if (!chunk->ready) {
+            memcpy(chunk->data, buf->datas[0].data, size);
+            chunk->size = size;
+            __sync_synchronize(); // Memory barrier
+            chunk->ready = 1;
+            *idx = (*idx + 1) & (MAX_BUFFERS - 1);
+        // }
     }
 
-    pw_stream_queue_buffer(d->capture_stream, b);
+    pw_stream_queue_buffer(node->stream, b);
 }
 
 static void on_playback_process(void *userdata) {
-    struct data *d = (struct data *)userdata;
-    struct pw_buffer *b;
-    struct spa_buffer *buf;
-    int idx;
+    const auto node = static_cast<::node *>(userdata);
+    pw_buffer *b;
 
-    if ((b = pw_stream_dequeue_buffer(d->playback_stream)) == NULL) {
+    if ((b = pw_stream_dequeue_buffer(node->stream)) == nullptr) {
         return;
     }
 
-    buf = b->buffer;
-    if (buf->datas[0].data != NULL) {
-        idx = d->read_idx;
+    const spa_buffer *buf = b->buffer;
+
+    if (is_not_null(buf->datas[0].data)) {
+        volatile uint8_t *idx = &node->buffer->read_idx;
+        audio_buffer *chunk = &node->buffer->chunks[*idx];
 
         // Read from buffer if ready
-        if (d->buffers[idx].ready) {
-            uint32_t size = d->buffers[idx].size;
+        if (chunk->ready) {
+            uint16_t size = chunk->size;
+
             if (size > buf->datas[0].maxsize)
                 size = buf->datas[0].maxsize;
 
-            memcpy(buf->datas[0].data, d->buffers[idx].data, size);
+            memcpy(buf->datas[0].data, chunk->data, size);
             buf->datas[0].chunk->size = size;
             buf->datas[0].chunk->stride = 4;
 
-            __sync_synchronize();  // Memory barrier
-            d->buffers[idx].ready = 0;
-            d->read_idx = (idx + 1) % MAX_BUFFERS;
+            __sync_synchronize(); // Memory barrier
+            chunk->ready = 0;
+            *idx = (*idx + 1) & (MAX_BUFFERS - 1);
         } else {
             // Output silence if no data available
             memset(buf->datas[0].data, 0, buf->datas[0].maxsize);
@@ -89,80 +96,85 @@ static void on_playback_process(void *userdata) {
         }
     }
 
-    pw_stream_queue_buffer(d->playback_stream, b);
+    pw_stream_queue_buffer(node->stream, b);
 }
 
-static const struct pw_stream_events capture_events = {
+static const pw_stream_events capture_events = {
     PW_VERSION_STREAM_EVENTS,
     .process = on_capture_process,
 };
 
-static const struct pw_stream_events playback_events = {
+static const pw_stream_events playback_events = {
     PW_VERSION_STREAM_EVENTS,
     .process = on_playback_process,
 };
 
-static void do_quit(void *userdata, int signal_number) {
-    struct data *d = (struct data *)userdata;
-    pw_main_loop_quit(d->loop);
+static void do_quit(void *loop, int signal_number) {
+    pw_main_loop_quit(static_cast<pw_main_loop *>(loop));
 }
 
 int main(int argc, char *argv[]) {
-    struct data data;
-    const struct spa_pod *params[1];
+    const spa_pod *params[1];
     uint8_t buffer[1024];
-    struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
-    struct spa_audio_info_raw audio_info;
-
-    memset(&data, 0, sizeof(data));
-
+    spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
     pw_init(&argc, &argv);
+    pw_main_loop *loop = pw_main_loop_new(nullptr);
+    pw_loop_add_signal(pw_main_loop_get_loop(loop), SIGINT, do_quit, &loop);
+    pw_loop_add_signal(pw_main_loop_get_loop(loop), SIGTERM, do_quit, &loop);
 
-    data.loop = pw_main_loop_new(NULL);
-
-    pw_loop_add_signal(pw_main_loop_get_loop(data.loop), SIGINT, do_quit, &data);
-    pw_loop_add_signal(pw_main_loop_get_loop(data.loop), SIGTERM, do_quit, &data);
+    node_buffer io_buffer = {.chunks = {0}, .write_idx = 0, .read_idx = 0 };
 
     // Create capture stream (microphone)
-    data.capture_stream = pw_stream_new_simple(
-        pw_main_loop_get_loop(data.loop),
-        "audio-capture",
-        pw_properties_new(
-            PW_KEY_MEDIA_TYPE, "Audio",
-            PW_KEY_MEDIA_CATEGORY, "Capture",
-            PW_KEY_MEDIA_ROLE, "Music",
-            NULL
+    node capture = {
+        .loop = loop,
+        .stream = pw_stream_new_simple(
+            pw_main_loop_get_loop(loop),
+            "n!audio-capture",
+            pw_properties_new(
+                PW_KEY_MEDIA_TYPE, "Audio",
+                PW_KEY_MEDIA_CATEGORY, "Capture",
+                PW_KEY_MEDIA_ROLE, "Music",
+                NULL
+            ),
+            &capture_events,
+            &capture
         ),
-        &capture_events,
-        &data
-    );
+        .buffer = &io_buffer
+    };
 
     // Create playback stream (speaker)
-    data.playback_stream = pw_stream_new_simple(
-        pw_main_loop_get_loop(data.loop),
-        "audio-playback",
-        pw_properties_new(
-            PW_KEY_MEDIA_TYPE, "Audio",
-            PW_KEY_MEDIA_CATEGORY, "Playback",
-            PW_KEY_MEDIA_ROLE, "Music",
-            NULL
+    node playback = {
+        .loop = loop,
+        .stream = pw_stream_new_simple(
+            pw_main_loop_get_loop(loop),
+            "n!audio-playback",
+            pw_properties_new(
+                PW_KEY_MEDIA_TYPE, "Audio",
+                PW_KEY_MEDIA_CATEGORY, "Playback",
+                PW_KEY_MEDIA_ROLE, "Music",
+                NULL
+            ),
+            &playback_events,
+            &playback
         ),
-        &playback_events,
-        &data
-    );
+        .buffer = &io_buffer
+    };
 
     // Set audio format: 48kHz, 16-bit, 2 channels (stereo)
-    audio_info.format = SPA_AUDIO_FORMAT_S16;
-    audio_info.channels = 2;
-    audio_info.rate = 48000;
+    spa_audio_info_raw audio_info = {
+        .format = SPA_AUDIO_FORMAT_S16,
+        .rate = 48000,
+        .channels = 2,
+    };
 
     params[0] = spa_format_audio_raw_build(&b, SPA_PARAM_EnumFormat, &audio_info);
 
     // Connect capture stream
-    pw_stream_connect(data.capture_stream,
+    pw_stream_connect(
+        capture.stream,
         PW_DIRECTION_INPUT,
         PW_ID_ANY,
-        (enum pw_stream_flags)(
+        (enum pw_stream_flags) (
             PW_STREAM_FLAG_AUTOCONNECT |
             PW_STREAM_FLAG_MAP_BUFFERS |
             PW_STREAM_FLAG_RT_PROCESS
@@ -174,24 +186,26 @@ int main(int argc, char *argv[]) {
     params[0] = spa_format_audio_raw_build(&b, SPA_PARAM_EnumFormat, &audio_info);
 
     // Connect playback stream
-    pw_stream_connect(data.playback_stream,
+    pw_stream_connect(
+        playback.stream,
         PW_DIRECTION_OUTPUT,
         PW_ID_ANY,
-        (enum pw_stream_flags)(
+        (enum pw_stream_flags) (
             PW_STREAM_FLAG_AUTOCONNECT |
             PW_STREAM_FLAG_MAP_BUFFERS |
             PW_STREAM_FLAG_RT_PROCESS
         ),
         params, 1);
 
+
     printf("Real-time mic to speaker forwarding. Press Ctrl+C to stop.\n");
     printf("Warning: This may cause feedback! Keep volume low or use headphones.\n");
-    pw_main_loop_run(data.loop);
+    pw_main_loop_run(loop);
 
-    pw_stream_destroy(data.capture_stream);
-    pw_stream_destroy(data.playback_stream);
-    pw_main_loop_destroy(data.loop);
+    pw_stream_destroy(capture.stream);
+    pw_stream_destroy(playback.stream);
+    pw_main_loop_destroy(loop);
     pw_deinit();
-    
+
     return 0;
 }

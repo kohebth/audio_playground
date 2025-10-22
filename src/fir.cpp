@@ -29,20 +29,3 @@ void applyFIR(const std::vector<float>& x, std::vector<float>& y, const std::vec
         y[n] = (float)acc;
     }
 }
-
-int main() {
-    std::vector<float> x, y, h(128);
-    float fs = 0;
-
-    if (!readWav("input.wav", x, fs)) {
-        printf("Failed to read input.wav\n");
-        return 1;
-    }
-
-    designLowpass(h, 1000.0f, fs);
-    applyFIR(x, y, h);
-    writeWav("output.wav", y, fs);
-
-    printf("Filtered output.wav written (%.0f Hz LPF)\n", fs);
-    return 0;
-}
