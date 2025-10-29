@@ -3,16 +3,14 @@
 #include <cstdio>
 #include <csignal>
 #include <cstring>
-// #include <buffer.h>
+#include <cmath>
+#include <effect.h>
 
-#define MAX_BUFFERS 4
-#define BUFFER_SIZE 2048
+#include <buffer.h>
 
-struct audio_buffer {
-    uint16_t data[BUFFER_SIZE];
-    uint16_t size;
-    volatile int ready;
-};
+#define MAX_BUFFERS 16
+#define BUFFER_SIZE 512
+#define BOUND 32767.0
 
 struct node_buffer {
     audio_buffer chunks[MAX_BUFFERS];
@@ -41,20 +39,20 @@ static void on_capture_process(void *userdata) {
     const spa_buffer *buf = b->buffer;
 
     if (is_not_null(buf->datas[0].data) && buf->datas[0].chunk->size > 0) {
-        uint16_t size = buf->datas[0].chunk->size;
+        uint32_t size = buf->datas[0].chunk->size;
         volatile uint8_t *idx = &node->buffer->write_idx;
         audio_buffer *chunk = &node->buffer->chunks[*idx];
 
         if (size > BUFFER_SIZE) size = BUFFER_SIZE;
 
         // Write to buffer if not in use
-        // if (!chunk->ready) {
+        if (!chunk->ready) {
             memcpy(chunk->data, buf->datas[0].data, size);
-            chunk->size = size;
+            chunk->length = size/sizeof(float);
             __sync_synchronize(); // Memory barrier
             chunk->ready = 1;
             *idx = (*idx + 1) & (MAX_BUFFERS - 1);
-        // }
+        }
     }
 
     pw_stream_queue_buffer(node->stream, b);
@@ -76,13 +74,17 @@ static void on_playback_process(void *userdata) {
 
         // Read from buffer if ready
         if (chunk->ready) {
-            uint16_t size = chunk->size;
+            uint16_t size = chunk->length;
 
             if (size > buf->datas[0].maxsize)
                 size = buf->datas[0].maxsize;
 
-            memcpy(buf->datas[0].data, chunk->data, size);
-            buf->datas[0].chunk->size = size;
+            // Process chunk in chain
+            chain_procces(chunk);
+
+            // Output
+            memcpy(buf->datas[0].data, chunk->data, size*sizeof(float));
+            buf->datas[0].chunk->size = size*sizeof(float);
             buf->datas[0].chunk->stride = 4;
 
             __sync_synchronize(); // Memory barrier
@@ -92,7 +94,7 @@ static void on_playback_process(void *userdata) {
             // Output silence if no data available
             memset(buf->datas[0].data, 0, buf->datas[0].maxsize);
             buf->datas[0].chunk->size = buf->datas[0].maxsize;
-            buf->datas[0].chunk->stride = 4;
+            buf->datas[0].chunk->stride = 1;
         }
     }
 
@@ -114,6 +116,8 @@ static void do_quit(void *loop, int signal_number) {
 }
 
 int main(int argc, char *argv[]) {
+    chain_init();
+
     const spa_pod *params[1];
     uint8_t buffer[1024];
     spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
@@ -122,7 +126,7 @@ int main(int argc, char *argv[]) {
     pw_loop_add_signal(pw_main_loop_get_loop(loop), SIGINT, do_quit, &loop);
     pw_loop_add_signal(pw_main_loop_get_loop(loop), SIGTERM, do_quit, &loop);
 
-    node_buffer io_buffer = {.chunks = {0}, .write_idx = 0, .read_idx = 0 };
+    node_buffer io_buffer = {.chunks = {0}, .write_idx = 0, .read_idx = 0};
 
     // Create capture stream (microphone)
     node capture = {
@@ -160,11 +164,11 @@ int main(int argc, char *argv[]) {
         .buffer = &io_buffer
     };
 
-    // Set audio format: 48kHz, 16-bit, 2 channels (stereo)
+    // Set audio format: 48kHz, 16-bit, 1 channels (stereo)
     spa_audio_info_raw audio_info = {
-        .format = SPA_AUDIO_FORMAT_S16,
+        .format = SPA_AUDIO_FORMAT_F32,
         .rate = 48000,
-        .channels = 2,
+        .channels = 1,
     };
 
     params[0] = spa_format_audio_raw_build(&b, SPA_PARAM_EnumFormat, &audio_info);
@@ -206,6 +210,8 @@ int main(int argc, char *argv[]) {
     pw_stream_destroy(playback.stream);
     pw_main_loop_destroy(loop);
     pw_deinit();
+
+    chain_deinit();
 
     return 0;
 }

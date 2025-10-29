@@ -21,9 +21,9 @@ struct Complex {
 
 typedef Complex FftComplex[16];
 
-double fast_atan(double x) {
-    return M_PI/4 * x + 0.273 * x * (1 - fabs(x));
-}
+// double fast_atan(double x) {
+//     return M_PI_4 * x + 0.273 * x * (1 - fabs(x));
+// }
 
 void show(Complex points[], size_t len) {
     // printf("Stage status:\n");
@@ -107,7 +107,7 @@ void ift(FftComplex &X) {
         }
     }
 
-    for (auto & k : X) {
+    for (auto &k: X) {
         k.re /= n;
         k.im /= n;
     }
