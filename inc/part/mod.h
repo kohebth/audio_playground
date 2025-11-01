@@ -2,10 +2,12 @@
 #define MODULATION_H
 
 #include <stdint.h>
+#include <unit.h>
+
 
 typedef struct Modulation Modulation;
 
-Modulation *mod_init(
+Modulation *init_Modulation(
     uint32_t fs,
     double delay,
     double fdback,
@@ -13,8 +15,8 @@ Modulation *mod_init(
     double depth
 );
 
-void mod_deinit(Modulation *p_mod);
+void deinit_Modulation(Modulation *p_mod);
 
-double mod_process(const Modulation *p_mod, double x);
+double apply_Modulation(const Modulation *p_mod, double x);
 
 #endif //MODULATION_H

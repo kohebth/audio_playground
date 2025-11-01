@@ -13,13 +13,18 @@ double fast_sigmoid(double x);
 
 double fast_tanh_safe(double x);
 
-// double fast_interpolate_cubic4(double xm1, double x0, double x1, double x2, double mu);
-double fast_interpolate_cubic4(float xm1, float x0, float x1, float x2, double mu);
+double fast_ipol_cubic4(float xm1, float x0, float x1, float x2, double mu);
 
-double fast_interpolate_linear(float x0, float x1, double mu);
+double fast_ipol_linear(double x0, double x1, double mu);
 
 double fast_tanh(double x);
 
 double fast_atan(double x);
+
+double fast_db2ratio(double val_dB);
+
+double fast_f2w(double f);
+
+double fast_t2w(double t);
 
 #endif //TANH_H

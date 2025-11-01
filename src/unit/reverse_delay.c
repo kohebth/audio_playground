@@ -20,7 +20,13 @@ struct ReverseDelay {
     Envelope *envelope;
 };
 
-ReverseDelay *reverse_delay_init(
+RevDelay *init_RevDelay() {
+    RevDelay *p_RevDelay = malloc(sizeof(RevDelay));
+    return p_RevDelay;
+}
+
+RevDelay *tune_RevDelay(
+    RevDelay *p_RevDelay,
     const uint32_t fs,
     const uint32_t threshold_dB,
     const uint32_t time_ms,
@@ -28,29 +34,32 @@ ReverseDelay *reverse_delay_init(
     const double mix
 ) {
     const uint32_t delayed_sample = fs * time_ms / 1000;
-    ReverseDelay * delay = malloc(sizeof(ReverseDelay));
-    delay->threshold = fast_exp(M_LN10 * 0.05 * threshold_dB);
-    delay->fdback = fast_exp(M_LN10 * 0.05 * fdback_dB);
-    delay->mix = mix;
-    delay->delayed_sample = delayed_sample;
-    delay->ring = ring_init(delay->delayed_sample);
-    delay->tape = (double *)malloc(sizeof(double) * delayed_sample);
-    delay->taped_sample = 0;
-    delay->taped_record = false;
-    delay->envelope = env_init(fs, 0.025, 0.001);
-    return delay;
+
+    p_RevDelay->threshold = fast_exp(M_LN10 * 0.05 * threshold_dB);
+    p_RevDelay->fdback = fast_exp(M_LN10 * 0.05 * fdback_dB);
+    p_RevDelay->mix = mix;
+    p_RevDelay->delayed_sample = delayed_sample;
+    p_RevDelay->ring = ring_init(p_RevDelay->delayed_sample);
+    p_RevDelay->tape = (double *) malloc(sizeof(double) * delayed_sample);
+    p_RevDelay->taped_sample = 0;
+    p_RevDelay->taped_record = false;
+    p_RevDelay->envelope = init_Envelope();
+    tune_Envelope(
+        p_RevDelay->envelope,
+        &(EnvelopeTune){.fs = fs, .attack_ms = 0.025, .release_ms = 0.010});
+    return p_RevDelay;
 }
 
-void reverse_delay_deinit(ReverseDelay *delay) {
-    envelope_deinit(delay->envelope);
+void deinit_RevDelay(RevDelay *delay) {
+    deinit_Envelope(delay->envelope);
     ring_deinit(delay->ring);
     free(delay->tape);
     free(delay);
 }
 
-double reverse_delay_process(ReverseDelay *delay, const double dry) {
+double apply_RevDelay(RevDelay *delay, const double dry) {
     if (!delay->taped_record) {
-        if (env_detect(delay->envelope, dry) > delay->threshold) {
+        if (apply_Envelope(delay->envelope, dry) > delay->threshold) {
             delay->taped_sample = 0;
             delay->taped_record = true;
         }

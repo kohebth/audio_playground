@@ -113,6 +113,8 @@ static const struct pw_stream_events playback_events = {
 };
 
 static void do_quit(void *loop, int signal_number) {
+    chain_deinit();
+
     pw_main_loop_quit(loop);
 }
 

@@ -1,3 +1,4 @@
+#include <fast_math.h>
 #include <mod.h>
 
 #include <lfo.h>
@@ -18,7 +19,7 @@ struct Modulation {
     LFO *lfo;
 };
 
-Modulation *mod_init(
+Modulation *init_Modulation(
     const uint32_t fs,
     const double delay,
     const double fdback,
@@ -38,23 +39,22 @@ Modulation *mod_init(
     return m;
 }
 
-double mod_process(const Modulation *p_mod, const double x) {
+double apply_Modulation(const Modulation *p_mod, const double x) {
     Ring *delay_line = p_mod->delay_line;
     LFO *lfo = p_mod->lfo;
 
     double delay = p_mod->setting.sample_delay + lfo_step(lfo);
     int32_t delay_samples = delay;
-    float frac = delay - delay_samples;
     double d0 = ring_get(delay_line, -delay_samples);
     double d1 = ring_get(delay_line, -delay_samples + 1);
 
-    double wet = d1 * (1.0 - frac) + d0 * frac;
+    double wet = fast_ipol_linear(d1, d0, delay - delay_samples);
     double fdback = p_mod->setting.fdback;
     ring_add(delay_line, fdback * wet + (1.0 - fdback) * x);
     return wet;
 }
 
-void mod_deinit(Modulation *p_mod) {
+void deinit_Modulation(Modulation *p_mod) {
     ring_deinit(p_mod->delay_line);
     free(p_mod);
 }

@@ -2,10 +2,14 @@
 #define REVERSE_DELAY_H
 #include <stdint.h>
 
-typedef struct ReverseDelay ReverseDelay;
+typedef struct ReverseDelay RevDelay;
 
-ReverseDelay *reverse_delay_init(uint32_t fs, uint32_t threshold_dB, uint32_t time_ms, double fdback_dB, double mix);
-double reverse_delay_process(ReverseDelay *delay, double dry);
-void reverse_delay_deinit(ReverseDelay *delay);
+RevDelay *init_RevDelay();
+
+RevDelay *tune_RevDelay(RevDelay *p_RevDelay, uint32_t fs, uint32_t threshold_dB, uint32_t time_ms, double fdback_dB, double mix);
+
+double apply_RevDelay(RevDelay *delay, double dry);
+
+void deinit_RevDelay(RevDelay *delay);
 
 #endif //REVERSE_DELAY_H

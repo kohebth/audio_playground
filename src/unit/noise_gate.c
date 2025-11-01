@@ -1,26 +1,24 @@
 #include "noise_gate.h"
 
 #include <stdlib.h>
-#include <effect.h>
 #include <reverse_delay.h>
 
-NoiseGate *NoiseGate_init() {
-    NoiseGate * unit = malloc(sizeof(NoiseGate));
-    unit->env = (Envelope *)malloc(sizeof(Envelope));
+extern uint32_t fs;
+
+NoiseGate *init_NoiseGate() {
+    NoiseGate *unit = malloc(sizeof(NoiseGate));
+    unit->env = init_Envelope();
     return unit;
 }
 
-double NoiseGate_process(NoiseGate *p_NoiseGate) {
+double apply_NoiseGate(NoiseGate *p_unit, const double x) {
 
 }
 
-void NoiseGate_tune(NoiseGate *p_NoiseGate, uint32_t threshold_dB, uint32_t attack_ms, uint32_t release_ms, double ratio) {
+void tune_NoiseGate(NoiseGate *p_unit, const NoiseGateTune *p_tune) {
 
 }
 
-void NoiseGate_deinit(NoiseGate *p_NoiseGate) {
-
+void deinit_NoiseGate(NoiseGate *p_unit) {
+    free(p_unit);
 }
-
-
-

@@ -51,42 +51,43 @@ static void apply_saturation3(LiveChunk *chunk, const double gain, const double 
 
 static const uint32_t fs = 48000;
 static Modulation *modulation;
-static IIRFilter *iir_emphaser;
-static IIRFilter *iir_de_emphaser;
-static IIRFilter *iir_anti_alias_low;
-static IIRFilter *iir_anti_alias_high;
-static IIRFilter *iir_reconstruct_low;
-static IIRFilter *iir_reconstruct_high;
+static IIR *iir_emphaser;
+static IIR *iir_de_emphaser;
+static IIR *iir_anti_alias_low;
+static IIR *iir_anti_alias_high;
+static IIR *iir_reconstruct_low;
+static IIR *iir_reconstruct_high;
 
 static double apply_modulation(void *m, double dry) {
-    double emphasized = iir_process(iir_emphaser, dry);
+    double emphasized = apply_IIR(iir_emphaser, dry);
     double anti_alias = emphasized;
-    anti_alias = iir_process(iir_anti_alias_low, anti_alias);
-    anti_alias = iir_process(iir_anti_alias_high, anti_alias);
+    anti_alias = apply_IIR(iir_anti_alias_low, anti_alias);
+    anti_alias = apply_IIR(iir_anti_alias_high, anti_alias);
 
-    double modulated = mod_process(m, anti_alias);
-    // modulated = modulation_process(m2, modulated);
+    double modulated = apply_Modulation(m, anti_alias);
+
     double reconstructed = modulated;
-    reconstructed = iir_process(iir_reconstruct_low, reconstructed);
-    reconstructed = iir_process(iir_reconstruct_high, reconstructed);
+    reconstructed = apply_IIR(iir_reconstruct_low, reconstructed);
+    reconstructed = apply_IIR(iir_reconstruct_high, reconstructed);
 
-    double deemphasized = iir_process(iir_de_emphaser, reconstructed);
+    double deemphasized = apply_IIR(iir_de_emphaser, reconstructed);
     return 0.5f * deemphasized + 0.5 * emphasized;
+    // return 0.5 * dry + 0.5 * apply_Modulation(m, dry);
 }
 
-static ReverseDelay *reverse_delay;
+static RevDelay *reverse_delay;
 
 static double apply_delay_reverse(void *unit, double dry) {
-    ReverseDelay *d = (unit);
-    return reverse_delay_process(d, dry);
+    RevDelay *d = (unit);
+    return apply_RevDelay(d, dry);
 }
 
 static void chain_apply(LiveChunk *chunk) {
-    fast_chunk_apply(chunk, NULL, apply_saturation);
+    // fast_chunk_apply(chunk, NULL, apply_saturation);
     // apply_noise_reduction(chunk, noiseThreshold, 0.1, 320, 0.02);
     fast_chunk_apply(chunk, modulation, apply_modulation);
 
-    fast_chunk_apply(chunk, reverse_delay, apply_delay_reverse);
+    // fast_chunk_apply(chunk, reverse_delay, apply_delay_reverse);
 }
 
 void chain_procces(LiveChunk *chunk) {
@@ -109,24 +110,67 @@ void chain_procces(LiveChunk *chunk) {
 #endif // LATENCY
 }
 
-void chain_deinit() {
-    mod_deinit(modulation);
-    iir_deinit(iir_emphaser);
-    iir_deinit(iir_de_emphaser);
-    iir_deinit(iir_anti_alias_low);
-    iir_deinit(iir_anti_alias_high);
-    iir_deinit(iir_reconstruct_low);
-    iir_deinit(iir_reconstruct_high);
-    reverse_delay_deinit(reverse_delay);
+void chain_tune() {
+    tune_IIR(iir_emphaser,
+             &(IIRTune){
+                 .fs = fs,
+                 .type = HSF,
+                 .value = {.shelf = (struct IIR_SHELF){410.0, 2341.0, 3.0, 12.0, 0.468}}
+             });
+    tune_IIR(iir_de_emphaser,
+             &(IIRTune){
+                 .fs = fs,
+                 .type = HSF,
+                 .value = {.shelf = (struct IIR_SHELF){410.0, 2341.0, -3.0, -12.0, 0.468}}
+             });
+    tune_IIR(iir_anti_alias_low,
+             &(IIRTune){
+                 .fs = fs,
+                 .type = HPF,
+                 .value = {.filter = (struct IIR_Filter){48.2, M_SQRT1_2}}
+             });
+
+    tune_IIR(iir_anti_alias_high,
+             &(IIRTune){
+                 .fs = fs,
+                 .type = LPF,
+                 .value = {.filter = (struct IIR_Filter){6600, M_SQRT1_2}}
+             });
+
+    tune_IIR(iir_reconstruct_low,
+             &(IIRTune){
+                 .fs = fs,
+                 .type = HPF,
+                 .value = {.filter = (struct IIR_Filter){18.6, M_SQRT1_2}}
+             });
+
+    tune_IIR(iir_reconstruct_high,
+             &(IIRTune){
+                 .fs = fs,
+                 .type = LPF,
+                 .value = {.filter = (struct IIR_Filter){6600, M_SQRT1_2}}
+             });
 }
 
 void chain_init() {
-    modulation = mod_init(fs, 23.04 / 1000, 0.2, 0.4, 12.0 / 1000);
-    iir_emphaser = iir_init_HSF(fs, 410, 3, 2341, 12, 0.468);
-    iir_de_emphaser = iir_init_HSF(fs, 410, -3, 2341, -12, 0.468);
-    iir_anti_alias_low = iir_init_HPF(fs, 48.2, M_SQRT1_2); // Butterworth 1/sqrt(2)
-    iir_anti_alias_high = iir_init_LPF(fs, 6600, M_SQRT1_2);
-    iir_reconstruct_low = iir_init_HPF(fs, 18.6, M_SQRT1_2); // Butterworth 1/sqrt(2)
-    iir_reconstruct_high = iir_init_LPF(fs, 6600, M_SQRT1_2);
-    reverse_delay = reverse_delay_init(fs, -20, 412, -3.2, 0.4);
+    modulation = init_Modulation(fs, 23.04 / 1000, 0.2, 3.4, 12.0 / 1000);
+    iir_emphaser = init_IIR();
+    iir_de_emphaser = init_IIR();
+    iir_anti_alias_low = init_IIR();
+    iir_anti_alias_high = init_IIR();
+    iir_reconstruct_low = init_IIR();
+    iir_reconstruct_high = init_IIR();
+    // tune_RevDelay(reverse_delay, fs, -20, 412, -3.2, 0.4);
+    chain_tune();
+}
+
+void chain_deinit() {
+    deinit_Modulation(modulation);
+    deinit_IIR(iir_emphaser);
+    deinit_IIR(iir_de_emphaser);
+    deinit_IIR(iir_anti_alias_low);
+    deinit_IIR(iir_anti_alias_high);
+    deinit_IIR(iir_reconstruct_low);
+    deinit_IIR(iir_reconstruct_high);
+    // deinit_RevDelay(reverse_delay);
 }

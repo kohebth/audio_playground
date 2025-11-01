@@ -2,24 +2,32 @@
 #define IIR_H
 
 #include <stdint.h>
+#include <unit.h>
 
+typedef enum {
+    LPF = 0, HPF, LSF, HSF, EQ,
+} IIRType;
 
-typedef struct IIRFilter IIRFilter;
-
-IIRFilter *iir_init_HPF(uint32_t fs, double fc, double Q);
-
-IIRFilter *iir_init_LPF(uint32_t fs, double fc, double Q);
-
-IIRFilter *iir_init_BPF(uint32_t fs, double fc, double Q);
-
-IIRFilter *iir_init_EQ(uint32_t fs, double fc, double Q, double G_dB);
-
-IIRFilter *iir_init_LSF(uint32_t fs, double fc_low, double low_dB, double fc_high, double high_dB, double slope);
-
-IIRFilter *iir_init_HSF(uint32_t fs, double fc_low, double low_dB, double fc_high, double high_dB, double slope);
-
-void iir_deinit(IIRFilter *p_filter);
-
-double iir_process(IIRFilter *p_filter, double x);
+UNIT(
+    IIR
+    ,
+    double a1; double a2;
+    double b0; double b1; double b2;
+    double x1; double x2;
+    double y1; double y2;
+    ,
+    IIRType type;
+    union {
+        struct IIR_Filter {
+            double fc; double Q;
+        } filter;
+        struct IIR_EQ {
+            double fc; double Q; double G_dB;
+        } eq;
+        struct IIR_SHELF {
+            double fc_low; double fc_high; double low_dB; double high_dB; double slope;
+        } shelf;
+    } value;
+)
 
 #endif //IIR_H
