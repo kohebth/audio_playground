@@ -1,8 +1,8 @@
 #include "lfo.h"
 
-#include <cstdlib>
-#include <cmath>
-#include <cstdint>
+#include <math.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 //LowFrequencyOscillator
 struct LFO {
@@ -12,13 +12,13 @@ struct LFO {
 };
 
 LFO *lfo_init_sine(const double fs, const double fm, double ampl) {
-    const auto lfo = static_cast<LFO *>(malloc(sizeof(LFO)));
+    LFO * lfo = malloc(sizeof(LFO));
 
-    const auto n = static_cast<size_t>(fs / fm);
-    const auto m_1_n = 1.0 / static_cast<double>(n);
+    const size_t n = (size_t)(fs / fm);
+    const double m_1_n = 1.0 / (double)n;
     double nw0 = 2.0 * M_PI * m_1_n;
 
-    lfo->start_lut = static_cast<double *>(malloc(n * sizeof(double)));
+    lfo->start_lut = (double *)malloc(n * sizeof(double));
     lfo->end_lut = lfo->start_lut + n;
     lfo->val = lfo->start_lut;
 
@@ -31,13 +31,13 @@ LFO *lfo_init_sine(const double fs, const double fm, double ampl) {
 }
 
 LFO *lfo_init_triangle(const double fs, const double fm, double ampl) {
-    const auto lfo = static_cast<LFO *>(malloc(sizeof(LFO)));
+    LFO * lfo = malloc(sizeof(LFO));
 
-    const auto n = static_cast<size_t>(fs / fm);
-    const auto m_1_n = 1.0 / static_cast<double>(n);
+    const size_t n = (size_t)(fs / fm);
+    const double m_1_n = 1.0 / (double)n;
     // double nw0 = 2.0 * M_PI * m_1_n;
 
-    lfo->start_lut = static_cast<double *>(malloc(n * sizeof(double)));
+    lfo->start_lut = (double *)malloc(n * sizeof(double));
     lfo->end_lut = lfo->start_lut + n;
     lfo->val = lfo->start_lut;
 
@@ -45,9 +45,9 @@ LFO *lfo_init_triangle(const double fs, const double fm, double ampl) {
     for (double *lut = lfo->start_lut; lut < lfo->end_lut; ++lut) {
         // *lut = ampl * M_2_PI * asin(sin(nw0 * i++));
         double phase = 4.0 * m_1_n * i++;
-        double f_phase = phase - static_cast<uint32_t>(phase);
+        double f_phase = phase - (uint32_t)phase;
 
-        switch (static_cast<uint32_t>(phase) % 4) {
+        switch ((uint32_t)phase % 4) {
             case 0:
                 *lut = +f_phase;
                 break;

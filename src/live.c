@@ -1,49 +1,49 @@
+#include <effect.h>
+#include <fast_chunk.h>
+
 #include <pipewire/pipewire.h>
 #include <spa/param/audio/format-utils.h>
-#include <cstdio>
-#include <csignal>
-#include <cstring>
-#include <cmath>
-#include <effect.h>
 
-#include <buffer.h>
+#include <signal.h>
+#include <stdio.h>
+#include <string.h>
 
-#define MAX_BUFFERS 16
-#define BUFFER_SIZE 512
+#define CHUNK_COUNT 16
+#define CHUNK_LENGTH 512
 #define BOUND 32767.0
 
-struct node_buffer {
-    audio_buffer chunks[MAX_BUFFERS];
+struct IOBuffers {
+    LiveChunk chunks[16];
     volatile uint8_t write_idx;
     volatile uint8_t read_idx;
 };
 
-struct node {
-    pw_main_loop *loop;
-    pw_stream *stream;
-    node_buffer *buffer;
+struct AudioNode {
+    struct pw_main_loop *loop;
+    struct pw_stream *stream;
+    struct IOBuffers *buffer;
 };
 
 inline bool is_not_null(void *ptr) {
-    return ptr != nullptr;
+    return ptr != NULL;
 }
 
 static void on_capture_process(void *userdata) {
-    auto node = static_cast<::node *>(userdata);
-    pw_buffer *b;
+    const struct AudioNode *node = (struct AudioNode *)(userdata);
+    struct pw_buffer *b;
 
-    if ((b = pw_stream_dequeue_buffer(node->stream)) == nullptr) {
+    if ((b = pw_stream_dequeue_buffer(node->stream)) == NULL) {
         return;
     }
 
-    const spa_buffer *buf = b->buffer;
+    const struct spa_buffer *buf = b->buffer;
 
     if (is_not_null(buf->datas[0].data) && buf->datas[0].chunk->size > 0) {
         uint32_t size = buf->datas[0].chunk->size;
         volatile uint8_t *idx = &node->buffer->write_idx;
-        audio_buffer *chunk = &node->buffer->chunks[*idx];
+        LiveChunk *chunk = &node->buffer->chunks[*idx];
 
-        if (size > BUFFER_SIZE) size = BUFFER_SIZE;
+        if (size > CHUNK_LENGTH) size = CHUNK_LENGTH;
 
         // Write to buffer if not in use
         if (!chunk->ready) {
@@ -51,7 +51,7 @@ static void on_capture_process(void *userdata) {
             chunk->length = size/sizeof(float);
             __sync_synchronize(); // Memory barrier
             chunk->ready = 1;
-            *idx = (*idx + 1) & (MAX_BUFFERS - 1);
+            *idx = (*idx + 1) & (CHUNK_COUNT - 1);
         }
     }
 
@@ -59,18 +59,18 @@ static void on_capture_process(void *userdata) {
 }
 
 static void on_playback_process(void *userdata) {
-    const auto node = static_cast<::node *>(userdata);
-    pw_buffer *b;
+    const struct AudioNode *node = (struct AudioNode *)(userdata);
+    struct pw_buffer *b;
 
-    if ((b = pw_stream_dequeue_buffer(node->stream)) == nullptr) {
+    if ((b = pw_stream_dequeue_buffer(node->stream)) == NULL) {
         return;
     }
 
-    const spa_buffer *buf = b->buffer;
+    const struct spa_buffer *buf = b->buffer;
 
     if (is_not_null(buf->datas[0].data)) {
         volatile uint8_t *idx = &node->buffer->read_idx;
-        audio_buffer *chunk = &node->buffer->chunks[*idx];
+        LiveChunk *chunk = &node->buffer->chunks[*idx];
 
         // Read from buffer if ready
         if (chunk->ready) {
@@ -89,47 +89,48 @@ static void on_playback_process(void *userdata) {
 
             __sync_synchronize(); // Memory barrier
             chunk->ready = 0;
-            *idx = (*idx + 1) & (MAX_BUFFERS - 1);
-        } else {
-            // Output silence if no data available
-            memset(buf->datas[0].data, 0, buf->datas[0].maxsize);
-            buf->datas[0].chunk->size = buf->datas[0].maxsize;
-            buf->datas[0].chunk->stride = 1;
+            *idx = (*idx + 1) & (CHUNK_COUNT - 1);
         }
+        // else {
+            // Output silence if no data available
+            // memset(buf->datas[0].data, 0, buf->datas[0].maxsize);
+            // buf->datas[0].chunk->size = buf->datas[0].maxsize;
+            // buf->datas[0].chunk->stride = 1;
+        // }
     }
 
     pw_stream_queue_buffer(node->stream, b);
 }
 
-static const pw_stream_events capture_events = {
+static const struct pw_stream_events capture_events = {
     PW_VERSION_STREAM_EVENTS,
     .process = on_capture_process,
 };
 
-static const pw_stream_events playback_events = {
+static const struct pw_stream_events playback_events = {
     PW_VERSION_STREAM_EVENTS,
     .process = on_playback_process,
 };
 
 static void do_quit(void *loop, int signal_number) {
-    pw_main_loop_quit(static_cast<pw_main_loop *>(loop));
+    pw_main_loop_quit(loop);
 }
 
 int main(int argc, char *argv[]) {
     chain_init();
 
-    const spa_pod *params[1];
+    const struct spa_pod *params[1];
     uint8_t buffer[1024];
-    spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
+    struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
     pw_init(&argc, &argv);
-    pw_main_loop *loop = pw_main_loop_new(nullptr);
+    struct pw_main_loop *loop = pw_main_loop_new(NULL);
     pw_loop_add_signal(pw_main_loop_get_loop(loop), SIGINT, do_quit, &loop);
     pw_loop_add_signal(pw_main_loop_get_loop(loop), SIGTERM, do_quit, &loop);
 
-    node_buffer io_buffer = {.chunks = {0}, .write_idx = 0, .read_idx = 0};
+    struct IOBuffers io_buffer = {.chunks = {0}, .write_idx = 0, .read_idx = 0};
 
     // Create capture stream (microphone)
-    node capture = {
+    struct AudioNode capture = {
         .loop = loop,
         .stream = pw_stream_new_simple(
             pw_main_loop_get_loop(loop),
@@ -147,7 +148,7 @@ int main(int argc, char *argv[]) {
     };
 
     // Create playback stream (speaker)
-    node playback = {
+    struct AudioNode playback = {
         .loop = loop,
         .stream = pw_stream_new_simple(
             pw_main_loop_get_loop(loop),
@@ -165,7 +166,7 @@ int main(int argc, char *argv[]) {
     };
 
     // Set audio format: 48kHz, 16-bit, 1 channels (stereo)
-    spa_audio_info_raw audio_info = {
+    struct spa_audio_info_raw audio_info = {
         .format = SPA_AUDIO_FORMAT_F32,
         .rate = 48000,
         .channels = 1,

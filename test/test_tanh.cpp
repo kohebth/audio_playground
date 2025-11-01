@@ -1,4 +1,4 @@
-#include <cmath>
+#include <math.h>
 #include<fast_math.h>
 #include <string>
 

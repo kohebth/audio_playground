@@ -1,42 +1,44 @@
 #ifndef EFFECT_H
 #define EFFECT_H
 
-#include <buffer.h>
-#include <ctime>
+#include <time.h>
+#include <fast_chunk.h>
 
-struct Envelope {
+typedef struct {
     double gain;
     double threshold;
     double ratio;
     time_t attack;
     time_t release;
-};
+} Dynamic;
 
-struct Gain {
+typedef struct {
     double gain;
     double tone;
     double volume;
-};
+} Gain;
 
-struct Modulate {
+typedef struct {
     double freq;
     double depth;
     double mix;
-};
+} Modulate;
 
-struct Delay {
+typedef struct {
     double feedback;
     time_t time;
     double mix;
-};
+} Delay;
 
-struct Reverb {
+typedef struct  {
     double damp;
     time_t time;
     double mix;
-};
+} Reverb;
 
-void chain_procces(audio_buffer *chunk);
+void chain_procces(LiveChunk *chunk);
+
 void chain_init();
+
 void chain_deinit();
 #endif //EFFECT_H

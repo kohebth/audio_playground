@@ -1,7 +1,9 @@
-#include <cmath>
-#include <cstdint>
-#include <cstdlib>
+#include <fast_math.h>
 #include <iir.h>
+
+#include <math.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #define M2PI (2.0 * M_PI)
 
@@ -13,7 +15,7 @@ struct IIRFilter {
 };
 
 IIRFilter *iir_init_LPF(const uint32_t fs, const double fc, const double Q) {
-    const auto p_filter = static_cast<IIRFilter *>(malloc(sizeof(IIRFilter)));
+    IIRFilter * p_filter = malloc(sizeof(IIRFilter));
     const double w0 = M2PI * fc / fs;
     const double sw0 = sin(w0);
     const double cw0 = cos(w0);
@@ -31,7 +33,7 @@ IIRFilter *iir_init_LPF(const uint32_t fs, const double fc, const double Q) {
 }
 
 IIRFilter *iir_init_HPF(const uint32_t fs, const double fc, const double Q) {
-    const auto p_filter = static_cast<IIRFilter *>(malloc(sizeof(IIRFilter)));
+    IIRFilter * p_filter = malloc(sizeof(IIRFilter));
     const double w0 = M2PI * fc / fs;
     const double sw0 = sin(w0);
     const double cw0 = cos(w0);
@@ -49,7 +51,7 @@ IIRFilter *iir_init_HPF(const uint32_t fs, const double fc, const double Q) {
 }
 
 IIRFilter *iir_init_BPF(const uint32_t fs, const double fc, const double Q) {
-    const auto p_filter = static_cast<IIRFilter *>(malloc(sizeof(IIRFilter)));
+    IIRFilter * p_filter = malloc(sizeof(IIRFilter));
     const double w0 = M2PI * fc / fs;
     const double sw0 = sin(w0);
     const double cw0 = cos(w0);
@@ -74,10 +76,10 @@ IIRFilter *iir_init_HSF(
     const double high_dB,
     const double slope
 ) {
-    const auto p_filter = static_cast<IIRFilter *>(malloc(sizeof(IIRFilter)));
+    IIRFilter * p_filter = malloc(sizeof(IIRFilter));
     const double fc_pole = sqrt(fc_high * fc_low);
     const double g_dB_pole = 0.5 * (high_dB + low_dB);
-    const double A = pow(10, 0.05 * g_dB_pole);
+    const double A = fast_exp(M_LOG10E * 0.05 * g_dB_pole);
     const double w0 = M2PI * fc_pole / fs;
 
     const double sqrt_A = sqrt(A);
@@ -109,10 +111,10 @@ IIRFilter *iir_init_LSF(
     const double high_dB,
     const double slope
 ) {
-    const auto p_filter = static_cast<IIRFilter *>(malloc(sizeof(IIRFilter)));
+    IIRFilter * p_filter = malloc(sizeof(IIRFilter));
     const double fc_pole = sqrt(fc_high * fc_low);
     const double g_dB_pole = 0.5 * (high_dB + low_dB);
-    const double A = pow(10, 0.05 * g_dB_pole);
+    const double A = fast_exp(M_LOG10E * 0.05 * g_dB_pole);
     const double w0 = M2PI * fc_pole / fs;
 
     const double sqrt_A = sqrt(A);
@@ -137,8 +139,8 @@ IIRFilter *iir_init_LSF(
 }
 
 IIRFilter *iir_init_EQ(const uint32_t fs, const double fc, const double Q, const double G_dB) {
-    const auto p_filter = static_cast<IIRFilter *>(malloc(sizeof(IIRFilter)));
-    const double A = pow(10, G_dB / 20.0);
+    IIRFilter * p_filter = malloc(sizeof(IIRFilter));
+    const double A = fast_exp(M_LOG10E * 0.05 * G_dB);
     const double w0 = M2PI * fc / fs;
     const double sinw0 = sin(w0), cosw0 = cos(w0);
     const double alpha_x_A = A * sinw0 / (2.0 * Q);

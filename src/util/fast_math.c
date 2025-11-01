@@ -1,18 +1,18 @@
-#include <cstdio>
-#include <cmath>
-#include <cstring>
+#include <stdio.h>
+#include <math.h>
+#include <string.h>
+#include <stdint.h>
 
-#include <iostream>
-#include <cstdlib>
+#include <stdlib.h>
 #include <fast_math.h>
 
 double fast_exp(double x) {
     // Approximate 2^f with a small polynomial
     x = M_LOG2E * x; // convert base e to base 2
-    auto i = static_cast<int32_t>(x);
+    int32_t i = (int32_t)x;
     double f = x - i;
 
-    constexpr double
+    const double
             c0 = 1.0000000000000000,
             c1 = 6.931471805599453e-1,
             c2 = 2.402265069591007e-1,
@@ -30,7 +30,7 @@ double fast_exp(double x) {
     else if (i > 1023)
         two_pow_i = INFINITY;
     else {
-        uint64_t bits = static_cast<uint64_t>(i + 1023) << 52;
+        uint64_t bits = (uint64_t)(i + 1023) << 52;
         memcpy(&two_pow_i, &bits, sizeof(double));
     }
     return two_pow_f * two_pow_i;
@@ -47,21 +47,21 @@ double fast_tanh(double x) {
     return x >= 0 ? y : -y;
 }
 
-inline float fast_recip(float x)
+inline float fast_recipf(float x)
 {
-    int32_t i = *reinterpret_cast<int32_t *>(&x);
+    int32_t i = *(int32_t *)&x;
     i = 0x7F000000 - i;
-    return *reinterpret_cast<float *>(&i);
+    return *(float *)&i;
 }
 
 inline double fast_recip(double x)
 {
-    auto i = 0x7FE0000000000000LL - *reinterpret_cast<int64_t *>(&x);
-    double y = *reinterpret_cast<double *>(&i);
+    uint64_t i = 0x7FE0000000000000LL - *(int64_t *)(&x);
+    double y = *(double *)(&i);
     return y * (2.0 - x * y);
 }
 
-double fast_interpolate_cubic4(int16_t xm1, int16_t x0, int16_t x1, int16_t x2, double mu) {
+double fast_interpolate_cubic4(float xm1, float x0, float x1, float x2, double mu) {
     double a0 = -0.5 * xm1 + 1.5 * x0 - 1.5 * x1 + 0.5 * x2;
     double a1 = xm1 - 2.5 * x0 + 2.0 * x1 - 0.5 * x2;
     double a2 = -0.5 * xm1 + 0.5 * x1;
@@ -69,7 +69,7 @@ double fast_interpolate_cubic4(int16_t xm1, int16_t x0, int16_t x1, int16_t x2, 
     return ((a0 * mu + a1) * mu + a2) * mu + a3;
 }
 
-double fast_interpolate_linear(int16_t x0, int16_t x1, double mu) {
+double fast_interpolate_linear(float x0, float x1, double mu) {
     return x0 + mu * (x1 - x0);
 }
 

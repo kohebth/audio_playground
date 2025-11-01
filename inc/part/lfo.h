@@ -1,7 +1,7 @@
 #ifndef LFO_H
 #define LFO_H
 
-struct LFO;
+typedef struct LFO LFO;
 
 LFO *lfo_init_sine(double fs, double fm, double ampl);
 

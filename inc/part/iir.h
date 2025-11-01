@@ -1,8 +1,10 @@
 #ifndef IIR_H
 #define IIR_H
 
+#include <stdint.h>
 
-struct IIRFilter;
+
+typedef struct IIRFilter IIRFilter;
 
 IIRFilter *iir_init_HPF(uint32_t fs, double fc, double Q);
 

@@ -1,13 +1,17 @@
 #ifndef WAVE_H
 #define WAVE_H
 
-#include <cstdio>
-#include <cstdint>
-#include <vector>
-#include <cmath>
-#include <algorithm>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
-struct WAVHeader {
+
+typedef struct {
+    float data[100000];
+    size_t size;
+} Samples;
+
+typedef struct {
     char riff[4];
     uint32_t chunkSize;
     char wave[4];
@@ -21,9 +25,10 @@ struct WAVHeader {
     uint16_t bitsPerSample;
     char data[4];
     uint32_t dataSize;
-};
+} WAVHeader;
 
-bool readWav(const char* filename, std::vector<float>& samples, float& fs);
-void writeWav(const char* filename, const std::vector<float>& samples, float fs);
+bool readWav(const char *filename, Samples *samples, float fs);
+
+void writeWav(const char *filename, Samples *samples, float fs);
 
 #endif //WAVE_H
