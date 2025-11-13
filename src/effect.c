@@ -115,41 +115,23 @@ void chain_tune() {
              &(IIRTune){
                  .fs = fs,
                  .type = HSF,
-                 .value = {.shelf = (struct IIR_SHELF){410.0, 2341.0, 3.0, 12.0, 0.468}}
+                 .value = {.shelf = (struct IIR_Shelf){410.0, 2341.0, 3.0, 12.0, 0.468}}
              });
     tune_IIR(iir_de_emphaser,
              &(IIRTune){
-                 .fs = fs,
-                 .type = HSF,
-                 .value = {.shelf = (struct IIR_SHELF){410.0, 2341.0, -3.0, -12.0, 0.468}}
+                 .fs = fs, .type = HSF, .value = {.shelf = {410.0, 2341.0, -3.0, -12.0, 0.468}}
              });
     tune_IIR(iir_anti_alias_low,
-             &(IIRTune){
-                 .fs = fs,
-                 .type = HPF,
-                 .value = {.filter = (struct IIR_Filter){48.2, M_SQRT1_2}}
-             });
+             &(IIRTune){.fs = fs, .type = HPF, .value = {.filter = {48.2, M_SQRT1_2}}});
 
     tune_IIR(iir_anti_alias_high,
-             &(IIRTune){
-                 .fs = fs,
-                 .type = LPF,
-                 .value = {.filter = (struct IIR_Filter){6600, M_SQRT1_2}}
-             });
+             &(IIRTune){.fs = fs, .type = LPF, .value = {.filter = {6600, M_SQRT1_2}}});
 
     tune_IIR(iir_reconstruct_low,
-             &(IIRTune){
-                 .fs = fs,
-                 .type = HPF,
-                 .value = {.filter = (struct IIR_Filter){18.6, M_SQRT1_2}}
-             });
+             &(IIRTune){.fs = fs, .type = HPF, .value = {.filter = {18.6, M_SQRT1_2}}});
 
     tune_IIR(iir_reconstruct_high,
-             &(IIRTune){
-                 .fs = fs,
-                 .type = LPF,
-                 .value = {.filter = (struct IIR_Filter){6600, M_SQRT1_2}}
-             });
+             &(IIRTune){.fs = fs, .type = LPF, .value = {.filter = {6600, M_SQRT1_2}}});
 }
 
 void chain_init() {

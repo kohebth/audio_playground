@@ -35,8 +35,8 @@ RevDelay *tune_RevDelay(
 ) {
     const uint32_t delayed_sample = fs * time_ms / 1000;
 
-    p_RevDelay->threshold = fast_exp(M_LN10 * 0.05 * threshold_dB);
-    p_RevDelay->fdback = fast_exp(M_LN10 * 0.05 * fdback_dB);
+    p_RevDelay->threshold = fast_exp2(M_LN10 * 0.05 * threshold_dB);
+    p_RevDelay->fdback = fast_exp2(M_LN10 * 0.05 * fdback_dB);
     p_RevDelay->mix = mix;
     p_RevDelay->delayed_sample = delayed_sample;
     p_RevDelay->ring = ring_init(p_RevDelay->delayed_sample);

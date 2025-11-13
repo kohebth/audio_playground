@@ -8,25 +8,44 @@ typedef enum {
     LPF = 0, HPF, LSF, HSF, EQ,
 } IIRType;
 
+typedef struct IIR_Filter IIRTune_Filter;
+
+typedef struct IIR_Shelf IIRTune_Shelf;
+
+typedef struct IIR_Eq IIRTune_Eq;
+
+struct IIR_Filter {
+    float fc;
+    float Q;
+};
+
+struct IIR_Shelf {
+    float fc_low;
+    float fc_high;
+    float low_dB;
+    float high_dB;
+    float slope;
+};
+
+struct IIR_Eq {
+    float fc;
+    float Q;
+    float G_dB;
+};
+
 UNIT(
     IIR
     ,
-    double a1; double a2;
-    double b0; double b1; double b2;
-    double x1; double x2;
-    double y1; double y2;
+    float a1; float a2;
+    float b0; float b1; float b2;
+    float x1; float x2;
+    float y1; float y2;
     ,
     IIRType type;
     union {
-        struct IIR_Filter {
-            double fc; double Q;
-        } filter;
-        struct IIR_EQ {
-            double fc; double Q; double G_dB;
-        } eq;
-        struct IIR_SHELF {
-            double fc_low; double fc_high; double low_dB; double high_dB; double slope;
-        } shelf;
+        IIRTune_Filter filter;
+        IIRTune_Shelf shelf;
+        IIRTune_Eq eq;
     } value;
 )
 

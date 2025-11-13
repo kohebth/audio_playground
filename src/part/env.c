@@ -14,8 +14,8 @@ Envelope *init_Envelope() {
     return p_unit;
 }
 
-double apply_Envelope(Envelope *p_unit, double x) {
-    const double abs_x = fabs(x);
+float apply_Envelope(Envelope *p_unit, float x) {
+    const float abs_x = fabs(x);
     p_unit->envelope = abs_x > p_unit->envelope
                                ? p_unit->attack_coef * p_unit->envelope + p_unit->sup_attack_coef * abs_x
                                : p_unit->release_coef * p_unit->envelope + p_unit->sup_release_coef * abs_x;
@@ -23,9 +23,9 @@ double apply_Envelope(Envelope *p_unit, double x) {
 }
 
 void tune_Envelope(Envelope *p_unit, const EnvelopeTune *p_tune) {
-    p_unit->attack_coef = fast_exp(-1.0 / (p_tune->fs * p_tune->attack_ms * 0.001));
+    p_unit->attack_coef = fast_exp2(-1.0 / (p_tune->fs * p_tune->attack_ms * 0.001));
     p_unit->sup_attack_coef = 1.0 - p_unit->attack_coef;
-    p_unit->release_coef = fast_exp(-1.0 / (p_tune->fs * p_tune->release_ms * 0.001));
+    p_unit->release_coef = fast_exp2(-1.0 / (p_tune->fs * p_tune->release_ms * 0.001));
     p_unit->sup_release_coef = 1.0 - p_unit->release_coef;
 }
 

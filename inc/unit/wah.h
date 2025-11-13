@@ -11,14 +11,15 @@ UNIT(
     ,
     double gain;
     double threshold;
-    double low;
-    double high;
+    double low_ln;
+    double high_ln;
     Envelope *enveloper;
     IIR *sweeper;
     ,
     double gain;
     uint32_t threshold_dB;
     EnvelopeTune *enveloper_tune;
+    IIRTune *sweeper_tune;
     double low_Hz;
     double high_Hz;
 )

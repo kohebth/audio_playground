@@ -11,7 +11,7 @@ NoiseGate *init_NoiseGate() {
     return unit;
 }
 
-double apply_NoiseGate(NoiseGate *p_unit, const double x) {
+float apply_NoiseGate(NoiseGate *p_unit, const float x) {
 
 }
 
